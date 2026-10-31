@@ -1,0 +1,23 @@
+{
+  "name": "fiveupdate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Keeps FiveM resources up to date from their GitHub releases without losing your changes",
+  "author": "IamZach",
+  "license": "MIT",
+  "homepage": "https://discord.gg/agn",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "tsx --test --test-force-exit test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

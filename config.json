@@ -1,0 +1,9 @@
+{
+    "checkHours": 6,
+    "keep": ["config.lua", "config.json", "config/**", "locales/**", "locale/**", "*.cfg"],
+    "ignore": [],
+    "resources": {},
+    "restart": false,
+    "backups": 5,
+    "discordKind": "resources"
+}
