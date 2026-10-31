@@ -153,7 +153,7 @@ function show(p: Prepared) {
     const w = Math.max(...p.changes.map((c) => c.path.length), 10) + 2;
     for (const c of p.changes) say(`  ${colors[c.action]}${pad(c.action, 9)}^7${pad(c.path, w)}${c.note ?? ''}`);
     const conflicts = p.changes.filter((c) => c.action === 'conflict');
-    if (conflicts.length) say(`\n  ^3For each conflict your file stays, and the new one is written next to it as <file>.new to compare by hand.^7`);
+    if (conflicts.length) say(), say(`  ^3For each conflict your file stays, and the new one is written next to it as <file>.new to compare by hand.^7`);
     say();
 }
 

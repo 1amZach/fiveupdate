@@ -6,6 +6,8 @@ Updating a resource by hand usually means copying the new version over the old o
 
 It works with any resource that has a `version` and a GitHub `repository` in its `fxmanifest.lua` and publishes releases on GitHub. That covers the ox resources, Qbox and most of the bigger open source scripts, as well as anything else you list in the config.
 
+![Checking for updates](docs/list.png)
+
 ## How it decides
 
 For every file in the old and new release:
@@ -19,6 +21,14 @@ For every file in the old and new release:
 | New in the release | added |
 | Dropped from the release and you didn't touch it | removed |
 | Your own files the release doesn't have | left alone |
+
+Here warden's config had test mode turned on. The update added a new option to the same file, so both are combined:
+
+![Previewing an update](docs/preview.png)
+
+And when the update changed the same lines you did:
+
+![A conflict](docs/conflict.png)
 
 JSON files that don't combine line by line are combined key by key. Line endings don't count as a change, so a Windows checkout with CRLF files is fine.
 
@@ -56,6 +66,8 @@ fiveupdate history                 past updates
 The preview shows the release notes and every file with what will happen to it. Nothing is written until you confirm, and the files it replaces are backed up to `backups/` first.
 
 `undo` puts every file back as it was before the update, byte for byte, without downloading anything. A file you changed after the update is left alone and named, so undo never throws away newer work. If the server crashed in the middle of an update, it says so on the next start, and `undo` cleans it up.
+
+![Updating and putting it back](docs/done.png)
 
 It checks every 6 hours and on start. New versions are posted to Discord once each, through [fivecord](https://github.com/1amZach/fivecord) if it's running, or the webhook.
 
