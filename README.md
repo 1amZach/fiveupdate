@@ -51,7 +51,7 @@ If the release you have installed can't be found on GitHub, there's no telling y
 
 ## Use
 
-Everything runs from the server console, or rcon. In-game players can't use it.
+Everything runs from the server console, or rcon. In-game players can't use it. With [fivepanel](https://github.com/1amZach/fivepanel), staff can also do it all from its Resources page.
 
 ```
 fiveupdate list                    what's tracked, and what has an update
@@ -89,13 +89,22 @@ After an update, restart the resource to load it, or turn on `restart` in the co
 
 ## For other resources
 
+Over server events, for resources that need to wait for an answer:
+
 ```js
-exports.fiveupdate.list()              // [{ name, repo, version, latest, error }]
-await exports.fiveupdate.check()       // the ones with an update
-await exports.fiveupdate.preview(name) // { from, to, exact, notes, files: [{ path, action, note }] }
+emit('fiveupdate:api', id, 'preview', 'ox_lib')
+on('fiveupdate:api:done', (id, ok, result) => { /* result is the error message when ok is false */ })
+```
+
+The actions are `list`, `check`, `preview`, `update`, `undo` and `history`. They're also exports:
+
+```js
+exports.fiveupdate.list()              // { checked, resources: [{ name, repo, version, latest, url, error, last }] }
+await exports.fiveupdate.check()       // checks GitHub, then the same as list
+await exports.fiveupdate.preview(name) // { name, from, to, exact, notes, url, files: [{ path, action, note }] }
 await exports.fiveupdate.update(name)  // writes it
 exports.fiveupdate.history()
-exports.fiveupdate.undo(name)
+await exports.fiveupdate.undo(name)    // { from, to, skipped }
 ```
 
 ## Support

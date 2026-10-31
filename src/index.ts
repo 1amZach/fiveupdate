@@ -33,6 +33,7 @@ interface Prepared {
 const tracked = new Map<string, Tracked>();
 const pending = new Map<string, Prepared>();
 let busy = false;
+let checked = 0;
 
 function scan() {
     const found = new Map<string, Tracked>();
@@ -52,6 +53,7 @@ const outdated = () => [...tracked.values()].filter((t) => t.latest && compare(t
 
 async function check(): Promise<Tracked[]> {
     scan();
+    checked = Date.now();
     for (const t of tracked.values()) {
         try {
             t.latest = await latest(t.repo, t.name);
@@ -259,26 +261,84 @@ async function tick() {
 }
 setTimeout(tick, 15e3);
 
-// For other resources, like a web panel. All but list return promises.
+// For other resources, like a web panel: as exports, or over events for
+// another resource to await without cross-resource promises.
+//   emit('fiveupdate:api', id, action, ...args)
+//   on('fiveupdate:api:done', (id, ok, result) => ...)
+const lastUpdate = (name: string) => {
+    const u = history(backups).find((h) => h.resource === name);
+    return u ? { from: u.from, to: u.to, time: u.time, state: u.state } : null;
+};
+
+async function locked<T>(fn: () => Promise<T> | T): Promise<T> {
+    if (busy) throw new Error('fiveupdate is busy with another update, try again in a moment');
+    busy = true;
+    try {
+        return await fn();
+    } finally {
+        busy = false;
+    }
+}
+
+const api: Record<string, (...args: any[]) => unknown> = {
+    list() {
+        scan();
+        return {
+            checked,
+            resources: [...tracked.values()].map((t) => ({
+                name: t.name,
+                repo: t.repo,
+                version: t.version,
+                latest: t.latest?.version ?? null,
+                url: t.latest?.url ?? null,
+                error: t.error ?? null,
+                last: lastUpdate(t.name),
+            })),
+        };
+    },
+    check: () => locked(async () => {
+        const out = await check();
+        void announce(out);
+        return api.list!();
+    }),
+    preview: (name: string) => locked(async () => {
+        const p = await prepare(name);
+        pending.set(name, p);
+        return {
+            name, from: p.from, to: p.to, exact: p.exact, notes: p.release.notes, url: p.release.url,
+            files: p.changes.map(({ path, action, note }) => ({ path, action, note: note ?? null })),
+        };
+    }),
+    update: (name: string) => locked(async () => {
+        const ready = pending.get(name);
+        const p = ready && Date.now() - ready.at < 10 * 60e3 ? ready : await prepare(name);
+        pending.delete(name);
+        if (!writes(p.changes).length) throw new Error(`${name} has nothing to write`);
+        const u = commit(p);
+        console.log(`fiveupdate: ${name} updated to ${u.to} by another resource. "fiveupdate undo ${name}" puts it back.`);
+        return { id: u.id, from: u.from, to: u.to, restarted: config.restart && name !== self };
+    }),
+    history: () => history(backups).map(({ id, resource, from, to, time, state }) => ({ id, resource, from, to, time, state })),
+    undo: (name: string) => locked(() => {
+        const u = history(backups).find((h) => h.resource === name && h.state !== 'undone');
+        if (!u) throw new Error(`no update of ${name} to undo`);
+        const done = undo(backups, GetResourcePath(name), u);
+        ExecuteCommand('refresh');
+        console.log(`fiveupdate: ${name} put back to ${u.from} by another resource`);
+        return { from: u.to, to: u.from, skipped: done.skipped ?? [] };
+    }),
+};
+
 const ex = (globalThis as any).exports;
-ex('list', () => {
-    scan();
-    return [...tracked.values()].map((t) => ({ name: t.name, repo: t.repo, version: t.version, latest: t.latest?.version ?? null, error: t.error ?? null }));
-});
-ex('check', async () => (await check()).map((t) => ({ name: t.name, version: t.version, latest: t.latest!.version })));
-ex('preview', async (name: string) => {
-    const p = await prepare(name);
-    pending.set(name, p);
-    return { from: p.from, to: p.to, exact: p.exact, notes: p.release.notes, files: p.changes.map(({ path, action, note }) => ({ path, action, note })) };
-});
-ex('update', async (name: string) => {
-    const ready = pending.get(name);
-    const p = ready && Date.now() - ready.at < 10 * 60e3 ? ready : await prepare(name);
-    pending.delete(name);
-    return commit(p);
-});
-ex('history', () => history(backups));
-ex('undo', (name: string) => {
-    const u = history(backups).find((h) => h.resource === name && h.state !== 'undone');
-    return u ? undo(backups, GetResourcePath(name), u) : null;
+for (const [name, fn] of Object.entries(api)) ex(name, fn);
+
+// Server side only: there's no onNet, so players can't send this.
+on('fiveupdate:api', async (id: number, action: string, ...args: unknown[]) => {
+    try {
+        const fn = api[action];
+        if (!fn) throw new Error(`unknown action ${action}`);
+        emit('fiveupdate:api:done', id, true, await fn(...args));
+    } catch (err) {
+        emit('fiveupdate:api:done', id, false, (err as Error).message);
+    }
 });

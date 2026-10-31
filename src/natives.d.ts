@@ -1,6 +1,7 @@
 // The FiveM server natives and globals this resource uses.
 
 declare function on(event: string, handler: (...args: any[]) => void): void;
+declare function emit(event: string, ...args: unknown[]): void;
 
 declare function GetCurrentResourceName(): string;
 declare function GetConvar(name: string, fallback: string): string;
